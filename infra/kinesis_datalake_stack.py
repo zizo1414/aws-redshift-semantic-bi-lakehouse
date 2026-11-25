@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import aws_cdk as cdk
-from aws_cdk import (
-    aws_ec2 as ec2,
-    aws_glue as glue,
-    aws_iam as iam,
-    aws_kinesis as kinesis,
-    aws_kinesisfirehose as firehose,
-    aws_kms as kms,
-    aws_s3 as s3,
-)
+from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_glue as glue
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kinesis as kinesis
+from aws_cdk import aws_kinesisfirehose as firehose
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 
