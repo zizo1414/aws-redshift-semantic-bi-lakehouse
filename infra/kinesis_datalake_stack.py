@@ -32,7 +32,7 @@ class KinesisDataLakeStack(cdk.Stack):
         self.vpc = ec2.Vpc(
             self,
             "LakehouseVpc",
-            max_azs=2,
+            availability_zones=["us-east-1a", "us-east-1b"],
             nat_gateways=0,
             subnet_configuration=[
                 ec2.SubnetConfiguration(

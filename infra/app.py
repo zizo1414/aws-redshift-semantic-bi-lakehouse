@@ -17,16 +17,17 @@ from infra.redshift_warehouse_stack import RedshiftWarehouseStack  # noqa: E402
 
 app = cdk.App()
 
-env = cdk.Environment(
-    account=os.getenv("CDK_DEFAULT_ACCOUNT", "123456789012"),
-    region=os.getenv("CDK_DEFAULT_REGION", os.getenv("AWS_REGION", "us-east-1")),
+cdk_account = os.getenv("CDK_DEFAULT_ACCOUNT")
+cdk_region = os.getenv("CDK_DEFAULT_REGION", os.getenv("AWS_REGION", "us-east-1"))
+stack_kwargs: dict[str, object] = (
+    {"env": cdk.Environment(account=cdk_account, region=cdk_region)} if cdk_account else {}
 )
 
 datalake_stack = KinesisDataLakeStack(
     app,
     "EvmKinesisDataLakeStack",
-    env=env,
     description="Kinesis On-Demand Stream, Firehose S3 Bronze/Silver Open Lake, VPC S3 Endpoint & KMS",
+    **stack_kwargs,
 )
 
 redshift_stack = RedshiftWarehouseStack(
@@ -36,16 +37,16 @@ redshift_stack = RedshiftWarehouseStack(
     kms_key=datalake_stack.kms_key,
     datalake_bucket=datalake_stack.datalake_bucket,
     event_stream=datalake_stack.event_stream,
-    env=env,
     description="Redshift Serverless for Zero-ETL Kinesis Streaming MVs, S3 Spectrum & Gold Star Schema",
+    **stack_kwargs,
 )
 
 quicksight_stack = QuickSightBiStack(
     app,
     "EvmQuickSightBiStack",
     redshift_workgroup_name="evm-enterprise-wg",
-    env=env,
     description="Governed QuickSight-as-Code DataSource and SPICE Semantic Dataset",
+    **stack_kwargs,
 )
 quicksight_stack.add_dependency(redshift_stack)
 
