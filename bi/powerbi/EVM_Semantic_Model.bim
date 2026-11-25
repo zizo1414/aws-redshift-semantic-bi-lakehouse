@@ -1,0 +1,389 @@
+{
+  "name": "enterprise_evm_delivery_intelligence",
+  "compatibilityLevel": 1600,
+  "model": {
+    "culture": "en-US",
+    "defaultPowerBIDataSourceVersion": "powerBI_V3",
+    "tables": [
+      {
+        "name": "fact_evm_daily",
+        "partitions": [
+          {
+            "name": "DirectQuery_Redshift_Gold",
+            "mode": "directQuery",
+            "source": {
+              "type": "m",
+              "expression": "Source{[Schema=\"gold\",Item=\"fact_evm_daily\"]}[Data]"
+            }
+          }
+        ],
+        "columns": [
+          {
+            "name": "snapshot_date",
+            "dataType": "dateTime"
+          },
+          {
+            "name": "project_sk",
+            "dataType": "int64"
+          },
+          {
+            "name": "region_code",
+            "dataType": "string"
+          },
+          {
+            "name": "bac_usd",
+            "dataType": "decimal"
+          },
+          {
+            "name": "cum_pv_usd",
+            "dataType": "decimal"
+          },
+          {
+            "name": "cum_ev_usd",
+            "dataType": "decimal"
+          },
+          {
+            "name": "cum_ac_labor_usd",
+            "dataType": "decimal"
+          },
+          {
+            "name": "cum_ac_cloud_usd",
+            "dataType": "decimal"
+          },
+          {
+            "name": "cum_ac_total_usd",
+            "dataType": "decimal"
+          }
+        ],
+        "measures": [
+          {
+            "name": "Budget at Completion (BAC)",
+            "description": "Total authorized baseline budget across scoped active project snapshots.",
+            "expression": "SUM('fact_evm_daily'[bac_usd])",
+            "formatString": "$#,##0",
+            "displayFolder": "01 Base EVM Totals"
+          },
+          {
+            "name": "Planned Value (PV)",
+            "description": "Authorized budget assigned to scheduled work as of snapshot date (BCWS).",
+            "expression": "SUM('fact_evm_daily'[cum_pv_usd])",
+            "formatString": "$#,##0",
+            "displayFolder": "01 Base EVM Totals"
+          },
+          {
+            "name": "Earned Value (EV)",
+            "description": "Authorized budget value of physical work actually completed (BCWP).",
+            "expression": "SUM('fact_evm_daily'[cum_ev_usd])",
+            "formatString": "$#,##0",
+            "displayFolder": "01 Base EVM Totals"
+          },
+          {
+            "name": "Actual Labor Cost",
+            "description": "Cumulative actual delivery engineering labor cost from Kinesis worklog events.",
+            "expression": "SUM('fact_evm_daily'[cum_ac_labor_usd])",
+            "formatString": "$#,##0",
+            "displayFolder": "01 Base EVM Totals"
+          },
+          {
+            "name": "Actual Cloud Spend",
+            "description": "Cumulative AWS & Databricks sandbox/production compute cost from Kinesis burn events.",
+            "expression": "SUM('fact_evm_daily'[cum_ac_cloud_usd])",
+            "formatString": "$#,##0",
+            "displayFolder": "01 Base EVM Totals"
+          },
+          {
+            "name": "Actual Cost (AC)",
+            "description": "Total cumulative cost incurred (Labor + Cloud Infrastructure) for work performed (ACWP).",
+            "expression": "SUM('fact_evm_daily'[cum_ac_total_usd])",
+            "formatString": "$#,##0",
+            "displayFolder": "01 Base EVM Totals"
+          },
+          {
+            "name": "Cost Variance (CV)",
+            "description": "EV minus AC. Negative values indicate over-budget execution.",
+            "expression": "[Earned Value (EV)] - [Actual Cost (AC)]",
+            "formatString": "$#,##0",
+            "displayFolder": "02 Variance"
+          },
+          {
+            "name": "Schedule Variance (SV)",
+            "description": "EV minus PV. Negative values indicate behind-schedule delivery.",
+            "expression": "[Earned Value (EV)] - [Planned Value (PV)]",
+            "formatString": "$#,##0",
+            "displayFolder": "02 Variance"
+          },
+          {
+            "name": "Cost Performance Index (CPI)",
+            "description": "Weighted portfolio cost efficiency (SUM(EV)/SUM(AC)). Strictly forbids naive AVG(CPI).",
+            "expression": "DIVIDE([Earned Value (EV)], [Actual Cost (AC)], BLANK())",
+            "formatString": "0.00",
+            "displayFolder": "02 Efficiency Index"
+          },
+          {
+            "name": "Schedule Performance Index (SPI)",
+            "description": "Weighted portfolio schedule efficiency (SUM(EV)/SUM(PV)). Values < 1.0 signal slippage.",
+            "expression": "DIVIDE([Earned Value (EV)], [Planned Value (PV)], BLANK())",
+            "formatString": "0.00",
+            "displayFolder": "02 Efficiency Index"
+          },
+          {
+            "name": "Estimate at Completion (EAC)",
+            "description": "Projected total cost at completion assuming current CPI persists (BAC / CPI).",
+            "expression": "DIVIDE([Budget at Completion (BAC)], [Cost Performance Index (CPI)], [Budget at Completion (BAC)])",
+            "formatString": "$#,##0",
+            "displayFolder": "02 Predictive Forecast"
+          },
+          {
+            "name": "EAC (Cost + Schedule Risk)",
+            "description": "Conservative executive forecast penalizing remaining work by both CPI and SPI.",
+            "expression": "[Actual Cost (AC)] + DIVIDE([Budget at Completion (BAC)] - [Earned Value (EV)], [Cost Performance Index (CPI)] * [Schedule Performance Index (SPI)], 0)",
+            "formatString": "$#,##0",
+            "displayFolder": "02 Predictive Forecast"
+          },
+          {
+            "name": "Variance at Completion (VAC)",
+            "description": "Projected budget surplus (+) or deficit (-) at project completion (BAC - EAC).",
+            "expression": "[Budget at Completion (BAC)] - [Estimate at Completion (EAC)]",
+            "formatString": "$#,##0",
+            "displayFolder": "02 Predictive Forecast"
+          },
+          {
+            "name": "To-Complete Performance Index (TCPI)",
+            "description": "Future cost efficiency required on remaining work to finish within original BAC. TCPI > 1.15 is virtually unrecoverable.",
+            "expression": "DIVIDE([Budget at Completion (BAC)] - [Earned Value (EV)], [Budget at Completion (BAC)] - [Actual Cost (AC)], BLANK())",
+            "formatString": "0.00",
+            "displayFolder": "02 Predictive Forecast"
+          },
+          {
+            "name": "Billable Utilization %",
+            "description": "Percentage of available regional engineering capacity billed to signed client SOWs.",
+            "expression": "DIVIDE(SUM('fact_utilization_daily'[billable_hours]), SUM('fact_utilization_daily'[capacity_hours]), 0)",
+            "formatString": "0.0%",
+            "displayFolder": "02 Workforce Capacity"
+          },
+          {
+            "name": "Global PoC & Accelerator Investment %",
+            "description": "Capacity invested in global pre-sales PoCs and reusable architectures (high-value ramp lever in emerging pods like MENA).",
+            "expression": "DIVIDE(SUM('fact_utilization_daily'[poc_investment_hours]), SUM('fact_utilization_daily'[capacity_hours]), 0)",
+            "formatString": "0.0%",
+            "displayFolder": "02 Workforce Capacity"
+          }
+        ]
+      },
+      {
+        "name": "fact_utilization_daily",
+        "partitions": [
+          {
+            "name": "DirectQuery_Utilization",
+            "mode": "directQuery",
+            "source": {
+              "type": "m",
+              "expression": "Source{[Schema=\"gold\",Item=\"fact_utilization_daily\"]}[Data]"
+            }
+          }
+        ],
+        "columns": [
+          {
+            "name": "work_date",
+            "dataType": "dateTime"
+          },
+          {
+            "name": "project_sk",
+            "dataType": "int64"
+          },
+          {
+            "name": "region_code",
+            "dataType": "string"
+          },
+          {
+            "name": "billable_hours",
+            "dataType": "decimal"
+          },
+          {
+            "name": "poc_investment_hours",
+            "dataType": "decimal"
+          },
+          {
+            "name": "capacity_hours",
+            "dataType": "decimal"
+          }
+        ]
+      },
+      {
+        "name": "dim_project",
+        "partitions": [
+          {
+            "name": "Dual_DimProject",
+            "mode": "dual"
+          }
+        ],
+        "columns": [
+          {
+            "name": "project_sk",
+            "dataType": "int64",
+            "isKey": true
+          },
+          {
+            "name": "project_id",
+            "dataType": "string"
+          },
+          {
+            "name": "project_name",
+            "dataType": "string"
+          },
+          {
+            "name": "region_code",
+            "dataType": "string"
+          },
+          {
+            "name": "practice_area",
+            "dataType": "string"
+          },
+          {
+            "name": "contract_type",
+            "dataType": "string"
+          }
+        ]
+      },
+      {
+        "name": "dim_region",
+        "partitions": [
+          {
+            "name": "Dual_DimRegion",
+            "mode": "dual"
+          }
+        ],
+        "columns": [
+          {
+            "name": "region_code",
+            "dataType": "string",
+            "isKey": true
+          },
+          {
+            "name": "region_name",
+            "dataType": "string"
+          },
+          {
+            "name": "maturity_stage",
+            "dataType": "string"
+          }
+        ]
+      },
+      {
+        "name": "dim_date",
+        "partitions": [
+          {
+            "name": "Dual_DimDate",
+            "mode": "dual"
+          }
+        ],
+        "columns": [
+          {
+            "name": "snapshot_date",
+            "dataType": "dateTime",
+            "isKey": true
+          },
+          {
+            "name": "fiscal_year",
+            "dataType": "int64"
+          },
+          {
+            "name": "fiscal_quarter",
+            "dataType": "string"
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "name": "rel_fact_evm_project",
+        "fromTable": "fact_evm_daily",
+        "fromColumn": "project_sk",
+        "toTable": "dim_project",
+        "toColumn": "project_sk",
+        "crossFilteringBehavior": "oneDirection"
+      },
+      {
+        "name": "rel_fact_evm_region",
+        "fromTable": "fact_evm_daily",
+        "fromColumn": "region_code",
+        "toTable": "dim_region",
+        "toColumn": "region_code",
+        "crossFilteringBehavior": "oneDirection"
+      },
+      {
+        "name": "rel_fact_evm_date",
+        "fromTable": "fact_evm_daily",
+        "fromColumn": "snapshot_date",
+        "toTable": "dim_date",
+        "toColumn": "snapshot_date",
+        "crossFilteringBehavior": "oneDirection"
+      },
+      {
+        "name": "rel_util_region",
+        "fromTable": "fact_utilization_daily",
+        "fromColumn": "region_code",
+        "toTable": "dim_region",
+        "toColumn": "region_code",
+        "crossFilteringBehavior": "oneDirection"
+      }
+    ],
+    "roles": [
+      {
+        "name": "GLOBAL_CFO",
+        "description": "Executive global visibility across AMER, EMEA, MENA, and APAC.",
+        "modelPermission": "read",
+        "tablePermissions": [
+          {
+            "name": "dim_region",
+            "filterExpression": "'dim_region'[region_code] IN {\"AMER\", \"EMEA\", \"MENA\", \"APAC\"}"
+          }
+        ]
+      },
+      {
+        "name": "VP_MENA",
+        "description": "Regional Practice Lead scoped strictly to MENA programs & capacity.",
+        "modelPermission": "read",
+        "tablePermissions": [
+          {
+            "name": "dim_region",
+            "filterExpression": "'dim_region'[region_code] IN {\"MENA\"}"
+          }
+        ]
+      },
+      {
+        "name": "VP_EMEA",
+        "description": "Regional Practice Lead scoped strictly to EMEA programs & capacity.",
+        "modelPermission": "read",
+        "tablePermissions": [
+          {
+            "name": "dim_region",
+            "filterExpression": "'dim_region'[region_code] IN {\"EMEA\"}"
+          }
+        ]
+      },
+      {
+        "name": "VP_AMER",
+        "description": "Regional Practice Lead scoped strictly to AMER programs & capacity.",
+        "modelPermission": "read",
+        "tablePermissions": [
+          {
+            "name": "dim_region",
+            "filterExpression": "'dim_region'[region_code] IN {\"AMER\"}"
+          }
+        ]
+      },
+      {
+        "name": "VP_APAC",
+        "description": "Regional Practice Lead scoped strictly to APAC programs & capacity.",
+        "modelPermission": "read",
+        "tablePermissions": [
+          {
+            "name": "dim_region",
+            "filterExpression": "'dim_region'[region_code] IN {\"APAC\"}"
+          }
+        ]
+      }
+    ]
+  }
+}

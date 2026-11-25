@@ -1,0 +1,46 @@
+bundle:
+  name: evm_semantic_lakehouse_interop
+
+variables:
+  catalog_name:
+    description: Unity Catalog name governing S3 Delta UniForm tables
+    default: evm_enterprise_prod
+  datalake_bucket:
+    description: Shared S3 Open Data Lake bucket queried by Databricks & Redshift Spectrum
+    default: enterprise-evm-lakehouse-prod
+
+resources:
+  jobs:
+    evm_silver_delta_uniform_job:
+      name: "[${bundle.target}] EVM Kinesis Bronze-to-Silver Delta UniForm Pipeline"
+      trigger:
+        periodic:
+          interval: 15
+          unit: MINUTES
+      tasks:
+        - task_key: curate_silver_baselines_and_events
+          spark_python_task:
+            python_file: ./pipelines/silver_delta_uniform_stream.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+              - "--bucket"
+              - "${var.datalake_bucket}"
+          environment_key: serverless_default
+      environments:
+        - environment_key: serverless_default
+          spec:
+            client: "1"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog_name: evm_enterprise_dev
+  prod:
+    mode: production
+    run_as:
+      service_principal_name: sp-evm-lakehouse-prod
+    variables:
+      catalog_name: evm_enterprise_prod

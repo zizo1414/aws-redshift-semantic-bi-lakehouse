@@ -1,0 +1,75 @@
+{
+  "modelName": "enterprise_evm_delivery_intelligence",
+  "version": "1.0.0",
+  "datasets": [
+    {
+      "dataSetId": "evm-executive-semantic-spice-dataset",
+      "importMode": "SPICE",
+      "refreshSchedule": "HOURLY",
+      "sourceView": "gold.v_semantic_evm_portfolio",
+      "rowLevelPermissionDataSet": {
+        "arn": "arn:aws:quicksight:us-east-1:123456789012:dataset/evm-rls-permissions",
+        "permissionPolicy": "GRANT_ACCESS",
+        "formatVersion": "VERSION_2"
+      },
+      "calculatedFields": [
+        {
+          "name": "Cost Variance (CV)",
+          "metricKey": "cost_variance_usd",
+          "expression": "sum({cum_ev_usd}) - sum({cum_ac_total_usd})"
+        },
+        {
+          "name": "Schedule Variance (SV)",
+          "metricKey": "schedule_variance_usd",
+          "expression": "sum({cum_ev_usd}) - sum({cum_pv_usd})"
+        },
+        {
+          "name": "Cost Performance Index (CPI)",
+          "metricKey": "cost_performance_index",
+          "expression": "sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0)"
+        },
+        {
+          "name": "Schedule Performance Index (SPI)",
+          "metricKey": "schedule_performance_index",
+          "expression": "sum({cum_ev_usd}) / nullIf(sum({cum_pv_usd}), 0)"
+        },
+        {
+          "name": "Estimate at Completion (EAC)",
+          "metricKey": "estimate_at_completion_usd",
+          "expression": "sum({bac_usd}) / nullIf(sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0), 0)"
+        },
+        {
+          "name": "EAC (Cost + Schedule Risk)",
+          "metricKey": "eac_composite_usd",
+          "expression": "sum({cum_ac_total_usd}) + ((sum({bac_usd}) - sum({cum_ev_usd})) / nullIf((sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0)) * (sum({cum_ev_usd}) / nullIf(sum({cum_pv_usd}), 0)), 0))"
+        },
+        {
+          "name": "Variance at Completion (VAC)",
+          "metricKey": "variance_at_completion_usd",
+          "expression": "sum({bac_usd}) - (sum({bac_usd}) / nullIf(sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0), 0))"
+        },
+        {
+          "name": "To-Complete Performance Index (TCPI)",
+          "metricKey": "to_complete_performance_index",
+          "expression": "(sum({bac_usd}) - sum({cum_ev_usd})) / nullIf(sum({bac_usd}) - sum({cum_ac_total_usd}), 0)"
+        },
+        {
+          "name": "Billable Utilization %",
+          "metricKey": "billable_utilization_pct",
+          "expression": "sum({billable_hours}) / nullIf(sum({capacity_hours}), 0)"
+        },
+        {
+          "name": "Global PoC & Accelerator Investment %",
+          "metricKey": "poc_investment_pct",
+          "expression": "sum({poc_investment_hours}) / nullIf(sum({capacity_hours}), 0)"
+        }
+      ]
+    },
+    {
+      "dataSetId": "evm-intraday-kinesis-directquery",
+      "importMode": "DIRECT_QUERY",
+      "refreshLatencyTargetSeconds": 10,
+      "sourceView": "gold.v_intraday_burn_anomalies"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "aws-redshift-semantic-bi-lakehouse-cdk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AWS CDK CLI wrapper for Kinesis, S3 Iceberg Lake, Redshift Serverless, and QuickSight-as-Code",
+  "devDependencies": {
+    "aws-cdk": "^2.170.0"
+  }
+}

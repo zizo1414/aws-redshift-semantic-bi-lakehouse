@@ -1,0 +1,25 @@
+[project]
+name = "aws-redshift-semantic-bi-lakehouse"
+version = "1.0.0"
+description = "Enterprise Real-Time Streaming Lakehouse, Governed Semantic Layer & Executive EVM BI Platform on AWS + Databricks (Kinesis, S3 Iceberg/Delta UniForm, Redshift Streaming Ingestion & Spectrum, QuickSight-as-Code & Power BI)"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".venv",
+    "cdk.out",
+    "node_modules",
+    ".git",
+    "data",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"

@@ -1,0 +1,217 @@
+# ==============================================================================
+# Governed Enterprise Semantic & Row-Level Security Model (Zero-dbt Native Spec)
+# Compiles deterministically to:
+#   1. Amazon Redshift Governed Semantic Views + RLS Policies
+#   2. Databricks Unity Catalog Metric Views (YAML Specification)
+#   3. Amazon QuickSight Calculated Fields (SPICE & DirectQuery)
+#   4. Power BI Tabular Model (.bim) & Production DAX Measures
+# ==============================================================================
+
+[model]
+name = "enterprise_evm_delivery_intelligence"
+version = "1.0.0"
+owner = "Enterprise Cloud Architecture & PMO BI"
+grain = ["snapshot_date", "project_sk", "region_code"]
+fact_table_redshift = "gold.fact_evm_daily"
+fact_table_databricks = "evm_enterprise_prod.gold.fact_evm_daily"
+utilization_table_redshift = "gold.fact_utilization_daily"
+
+[[dimensions]]
+name = "dim_project"
+join_key = "project_sk"
+distribution = "ALL"
+attributes = ["project_id", "project_name", "region_code", "practice_area", "contract_type", "project_manager", "bac_usd", "start_date", "target_end_date"]
+
+[[dimensions]]
+name = "dim_region"
+join_key = "region_code"
+distribution = "ALL"
+attributes = ["region_code", "region_name", "maturity_stage", "vp_owner", "target_utilization_pct"]
+
+[[dimensions]]
+name = "dim_date"
+join_key = "snapshot_date"
+distribution = "ALL"
+attributes = ["snapshot_date", "fiscal_year", "fiscal_quarter", "month_name", "is_month_end"]
+
+# ------------------------------------------------------------------------------
+# Additive Base Measures
+# ------------------------------------------------------------------------------
+[[base_measures]]
+name = "budget_at_completion_usd"
+label = "Budget at Completion (BAC)"
+column = "bac_usd"
+aggregation = "SUM"
+format = "$#,##0"
+description = "Total authorized baseline budget across scoped active project snapshots."
+
+[[base_measures]]
+name = "planned_value_usd"
+label = "Planned Value (PV)"
+column = "cum_pv_usd"
+aggregation = "SUM"
+format = "$#,##0"
+description = "Authorized budget assigned to scheduled work as of snapshot date (BCWS)."
+
+[[base_measures]]
+name = "earned_value_usd"
+label = "Earned Value (EV)"
+column = "cum_ev_usd"
+aggregation = "SUM"
+format = "$#,##0"
+description = "Authorized budget value of physical work actually completed (BCWP)."
+
+[[base_measures]]
+name = "actual_labor_cost_usd"
+label = "Actual Labor Cost"
+column = "cum_ac_labor_usd"
+aggregation = "SUM"
+format = "$#,##0"
+description = "Cumulative actual delivery engineering labor cost from Kinesis worklog events."
+
+[[base_measures]]
+name = "actual_cloud_cost_usd"
+label = "Actual Cloud Spend"
+column = "cum_ac_cloud_usd"
+aggregation = "SUM"
+format = "$#,##0"
+description = "Cumulative AWS & Databricks sandbox/production compute cost from Kinesis burn events."
+
+[[base_measures]]
+name = "actual_cost_total_usd"
+label = "Actual Cost (AC)"
+column = "cum_ac_total_usd"
+aggregation = "SUM"
+format = "$#,##0"
+description = "Total cumulative cost incurred (Labor + Cloud Infrastructure) for work performed (ACWP)."
+
+# ------------------------------------------------------------------------------
+# Governed Non-Additive Ratio & Forecasting Metrics (Prevents Naive AVG(CPI)!)
+# ------------------------------------------------------------------------------
+[[derived_metrics]]
+name = "cost_variance_usd"
+label = "Cost Variance (CV)"
+category = "Variance"
+format = "$#,##0"
+sql_expr = "SUM(f.cum_ev_usd) - SUM(f.cum_ac_total_usd)"
+dax_expr = "[Earned Value (EV)] - [Actual Cost (AC)]"
+quicksight_expr = "sum({cum_ev_usd}) - sum({cum_ac_total_usd})"
+description = "EV minus AC. Negative values indicate over-budget execution."
+
+[[derived_metrics]]
+name = "schedule_variance_usd"
+label = "Schedule Variance (SV)"
+category = "Variance"
+format = "$#,##0"
+sql_expr = "SUM(f.cum_ev_usd) - SUM(f.cum_pv_usd)"
+dax_expr = "[Earned Value (EV)] - [Planned Value (PV)]"
+quicksight_expr = "sum({cum_ev_usd}) - sum({cum_pv_usd})"
+description = "EV minus PV. Negative values indicate behind-schedule delivery."
+
+[[derived_metrics]]
+name = "cost_performance_index"
+label = "Cost Performance Index (CPI)"
+category = "Efficiency Index"
+format = "0.00"
+sql_expr = "ROUND(SUM(f.cum_ev_usd) / NULLIF(SUM(f.cum_ac_total_usd), 0), 4)"
+dax_expr = "DIVIDE([Earned Value (EV)], [Actual Cost (AC)], BLANK())"
+quicksight_expr = "sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0)"
+description = "Weighted portfolio cost efficiency (SUM(EV)/SUM(AC)). Strictly forbids naive AVG(CPI)."
+
+[[derived_metrics]]
+name = "schedule_performance_index"
+label = "Schedule Performance Index (SPI)"
+category = "Efficiency Index"
+format = "0.00"
+sql_expr = "ROUND(SUM(f.cum_ev_usd) / NULLIF(SUM(f.cum_pv_usd), 0), 4)"
+dax_expr = "DIVIDE([Earned Value (EV)], [Planned Value (PV)], BLANK())"
+quicksight_expr = "sum({cum_ev_usd}) / nullIf(sum({cum_pv_usd}), 0)"
+description = "Weighted portfolio schedule efficiency (SUM(EV)/SUM(PV)). Values < 1.0 signal slippage."
+
+[[derived_metrics]]
+name = "estimate_at_completion_usd"
+label = "Estimate at Completion (EAC)"
+category = "Predictive Forecast"
+format = "$#,##0"
+sql_expr = "ROUND(SUM(f.bac_usd) / NULLIF(SUM(f.cum_ev_usd) / NULLIF(SUM(f.cum_ac_total_usd), 0), 0), 2)"
+dax_expr = "DIVIDE([Budget at Completion (BAC)], [Cost Performance Index (CPI)], [Budget at Completion (BAC)])"
+quicksight_expr = "sum({bac_usd}) / nullIf(sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0), 0)"
+description = "Projected total cost at completion assuming current CPI persists (BAC / CPI)."
+
+[[derived_metrics]]
+name = "eac_composite_usd"
+label = "EAC (Cost + Schedule Risk)"
+category = "Predictive Forecast"
+format = "$#,##0"
+sql_expr = "ROUND(SUM(f.cum_ac_total_usd) + ((SUM(f.bac_usd) - SUM(f.cum_ev_usd)) / NULLIF((SUM(f.cum_ev_usd) / NULLIF(SUM(f.cum_ac_total_usd), 0)) * (SUM(f.cum_ev_usd) / NULLIF(SUM(f.cum_pv_usd), 0)), 0)), 2)"
+dax_expr = "[Actual Cost (AC)] + DIVIDE([Budget at Completion (BAC)] - [Earned Value (EV)], [Cost Performance Index (CPI)] * [Schedule Performance Index (SPI)], 0)"
+quicksight_expr = "sum({cum_ac_total_usd}) + ((sum({bac_usd}) - sum({cum_ev_usd})) / nullIf((sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0)) * (sum({cum_ev_usd}) / nullIf(sum({cum_pv_usd}), 0)), 0))"
+description = "Conservative executive forecast penalizing remaining work by both CPI and SPI."
+
+[[derived_metrics]]
+name = "variance_at_completion_usd"
+label = "Variance at Completion (VAC)"
+category = "Predictive Forecast"
+format = "$#,##0"
+sql_expr = "ROUND(SUM(f.bac_usd) - (SUM(f.bac_usd) / NULLIF(SUM(f.cum_ev_usd) / NULLIF(SUM(f.cum_ac_total_usd), 0), 0)), 2)"
+dax_expr = "[Budget at Completion (BAC)] - [Estimate at Completion (EAC)]"
+quicksight_expr = "sum({bac_usd}) - (sum({bac_usd}) / nullIf(sum({cum_ev_usd}) / nullIf(sum({cum_ac_total_usd}), 0), 0))"
+description = "Projected budget surplus (+) or deficit (-) at project completion (BAC - EAC)."
+
+[[derived_metrics]]
+name = "to_complete_performance_index"
+label = "To-Complete Performance Index (TCPI)"
+category = "Predictive Forecast"
+format = "0.00"
+sql_expr = "ROUND((SUM(f.bac_usd) - SUM(f.cum_ev_usd)) / NULLIF(SUM(f.bac_usd) - SUM(f.cum_ac_total_usd), 0), 4)"
+dax_expr = "DIVIDE([Budget at Completion (BAC)] - [Earned Value (EV)], [Budget at Completion (BAC)] - [Actual Cost (AC)], BLANK())"
+quicksight_expr = "(sum({bac_usd}) - sum({cum_ev_usd})) / nullIf(sum({bac_usd}) - sum({cum_ac_total_usd}), 0)"
+description = "Future cost efficiency required on remaining work to finish within original BAC. TCPI > 1.15 is virtually unrecoverable."
+
+[[derived_metrics]]
+name = "billable_utilization_pct"
+label = "Billable Utilization %"
+category = "Workforce Capacity"
+format = "0.0%"
+sql_expr = "ROUND(100.0 * SUM(u.billable_hours) / NULLIF(SUM(u.capacity_hours), 0), 2)"
+dax_expr = "DIVIDE(SUM('fact_utilization_daily'[billable_hours]), SUM('fact_utilization_daily'[capacity_hours]), 0)"
+quicksight_expr = "sum({billable_hours}) / nullIf(sum({capacity_hours}), 0)"
+description = "Percentage of available regional engineering capacity billed to signed client SOWs."
+
+[[derived_metrics]]
+name = "poc_investment_pct"
+label = "Global PoC & Accelerator Investment %"
+category = "Workforce Capacity"
+format = "0.0%"
+sql_expr = "ROUND(100.0 * SUM(u.poc_investment_hours) / NULLIF(SUM(u.capacity_hours), 0), 2)"
+dax_expr = "DIVIDE(SUM('fact_utilization_daily'[poc_investment_hours]), SUM('fact_utilization_daily'[capacity_hours]), 0)"
+quicksight_expr = "sum({poc_investment_hours}) / nullIf(sum({capacity_hours}), 0)"
+description = "Capacity invested in global pre-sales PoCs and reusable architectures (high-value ramp lever in emerging pods like MENA)."
+
+# ------------------------------------------------------------------------------
+# Governed Row-Level Security (RLS) Personas
+# ------------------------------------------------------------------------------
+[[rls_personas]]
+role = "GLOBAL_CFO"
+description = "Executive global visibility across AMER, EMEA, MENA, and APAC."
+allowed_regions = ["AMER", "EMEA", "MENA", "APAC"]
+
+[[rls_personas]]
+role = "VP_MENA"
+description = "Regional Practice Lead scoped strictly to MENA programs & capacity."
+allowed_regions = ["MENA"]
+
+[[rls_personas]]
+role = "VP_EMEA"
+description = "Regional Practice Lead scoped strictly to EMEA programs & capacity."
+allowed_regions = ["EMEA"]
+
+[[rls_personas]]
+role = "VP_AMER"
+description = "Regional Practice Lead scoped strictly to AMER programs & capacity."
+allowed_regions = ["AMER"]
+
+[[rls_personas]]
+role = "VP_APAC"
+description = "Regional Practice Lead scoped strictly to APAC programs & capacity."
+allowed_regions = ["APAC"]

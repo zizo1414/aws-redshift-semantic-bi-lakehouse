@@ -1,0 +1,37 @@
+{
+  "dashboardId": "evm-global-delivery-intelligence-cockpit",
+  "name": "Global Enterprise EVM, Utilization & Kinesis Burn Cockpit",
+  "sheets": [
+    {
+      "sheetId": "sheet_1_scurve",
+      "title": "1. Executive EVM S-Curve & EAC Trajectory",
+      "visuals": [
+        "KPI_Banner: BAC | PV | EV | AC | CPI | SPI | EAC | VAC | TCPI",
+        "LineChart_SCurve: snapshot_date vs Cum PV, Cum EV, Cum AC + EAC Projection"
+      ]
+    },
+    {
+      "sheetId": "sheet_2_quadrant",
+      "title": "2. Portfolio Risk Matrix (CPI x SPI Scatter)",
+      "visuals": [
+        "ScatterPlot: X=SPI, Y=CPI, Size=BAC ($), Color=Region (AMER/EMEA/MENA/APAC)",
+        "Table_AtRiskPrograms: Filtered to TCPI > 1.10 or CPI < 0.90"
+      ]
+    },
+    {
+      "sheetId": "sheet_3_utilization",
+      "title": "3. Global Capacity, Regional Ramp & PoC Investment",
+      "visuals": [
+        "StackedBar_Capacity: Billable % vs Global PoC Accelerator % vs Bench Ramp %",
+        "ComparisonCard: Established Pods (AMER/EMEA) vs Emerging Pods (MENA)"
+      ]
+    },
+    {
+      "sheetId": "sheet_4_kinesis_live",
+      "title": "4. Live Kinesis Intraday Cloud & Labor Burn Watchdog (<10s DirectQuery)",
+      "visuals": [
+        "AlertFeed: CRITICAL_IDLE_CLOUD_BURN & HIGH_VELOCITY_BURN from mv_live_project_burn"
+      ]
+    }
+  ]
+}

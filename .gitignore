@@ -1,0 +1,33 @@
+# Virtual environments & dependencies
+.venv/
+venv/
+node_modules/
+package-lock.json
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# AWS CDK & Environment secrets
+cdk.out/
+.env
+.env.local
+
+# Local simulated Data Lake & Warehouse artifacts
+data/landing/
+data/lakehouse/
+data/warehouse/
+*.db
+*.sqlite
+*.duckdb
+
+# OS & Editor files
+.DS_Store
+.vscode/
+.idea/
